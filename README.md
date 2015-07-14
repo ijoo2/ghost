@@ -1,5 +1,5 @@
 # ghost
 
-Hello
+Hello, world!
 
 korean ghost
