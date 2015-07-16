@@ -2,4 +2,4 @@
 
 Hello, world!
 
-korean ghost
+I am a ghost
