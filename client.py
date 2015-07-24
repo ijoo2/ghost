@@ -1,4 +1,4 @@
-from socket import socket
+from socket import socket, AF_INET, SOCK_STREAM
 
 class Client(object):
     def __init__(self, pid, name, sock=None, nm=None):
@@ -9,7 +9,7 @@ class Client(object):
         self._connect_gc('localhost', 12345) # localhost for now
 
     def _connect_gc(self, host, port):
-        self.gc = socket()
+        self.gc = socket(AF_INET, SOCK_STREAM)
         server_address = ('localhost', 12345)
         try:
             self.gc.connect((host, port))
@@ -21,23 +21,20 @@ class Client(object):
         try:
             # Send data
             print 'CLIENT: sending hello'
-            sent = self.sock.sendto('hello', server_address)
+            sent = self.gc.send('hello')
 
             # Receive response
             print 'CLIENT: waiting to receive'
-            data, server = self.gc.recvfrom()
+            data = self.gc.recv(4096)
             print 'CLIENT: received %s' % data
 
         finally:
             print 'CLIENT: closing socket'
             self._close_gc()
 
-
-
-
     def _close_gc(self):
-        if self.sock:
-            self.sock.close()
+        if self.gc:
+            self.gc.close()
 
     # Close/cleanup network connections
     def disconnect(self):
@@ -54,3 +51,6 @@ class Client(object):
 
     def __str__(self):
         return '%s (%s)' %(self.name, self.pid)
+
+if __name__ == '__main__':
+    client = Client(10, 'Test')
