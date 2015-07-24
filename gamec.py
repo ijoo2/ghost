@@ -15,7 +15,7 @@ class GameCoordinator(socket.socket):
     def start_gc(self):
         server_address = ('localhost',12345)
         self.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        print ('SERVER: Launching server server_address=%s, port=%s') %(server_address)
+        print 'SERVER: Launching server server_address=%s, port=%s' %server_address
         self.bind(server_address) ##localhost for now
         self.listen(1)
 
