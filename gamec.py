@@ -3,33 +3,76 @@
 import socket
 import sys
 import signal
-## from lobby import Lobby
+import threading
+import select
+import json
+import time
+##import lobby
 
-
-class GameCoordinator(socket.socket):
+class UnknownDataType(Exception):
     def __init__(self):
-        super(GameCoordinator, self).__init__(socket.AF_INET, socket.SOCK_STREAM)
+        pass
+    def __str__(self):
+        return 'Unknown data type in request.'
+
+class InvalidRequest(Exception):
+    def __init__(self):
+        pass
+    def __str__(self):
+        return 'Invalid request: Incorrect format for data type'
+
+class GameCoordinator(object):
+    def __init__(self, host='localhost', port=12345):
+        self.host = host
+        self.port = port
+        self.server = None
+        self.BUFFER_SIZE = 1024
+
+        self._threads = []
         self._lobbies = {}
-        self.start_gc()
+        self._clients = []
+        self._client_thread_map = {}
+        
+    def _start_gc(self):
+        try:
+            self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            print 'SERVER: Launching server host=%s, port=%s' %(self.host, self.port)
+            self.server.bind((self.host, self.port)) ##localhost for now
+            self.server.listen(5)
+        except socket.error, (val, msg):
+            if self.server:
+                self.server.close()
+            print 'Error opening socket: %s' %(msg)
+            sys.exit(1)
 
-    def start_gc(self):
-        server_address = ('localhost',12345)
-        self.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        print 'SERVER: Launching server server_address=%s, port=%s' %server_address
-        self.bind(server_address) ##localhost for now
-        self.listen(1)
-
+    def _run(self):
+        self._start_gc()
+        inp = [self.server]
         while True:
-            conn, addr = self.accept()
-            while True:
-                print 'SERVER: Waiting for message...'
-                data = conn.recv(4096)
-                print 'SERVER: received %s bytes from %s' % (len(data), addr)
+            inqueue, outqueue, exqueue = select.select(inp, [], [])
+                                                       
+            for s in inqueue:
+                if s == self.server:
+                    t = threading.Thread()
+                    client = self.server.accept() + (self.BUFFER_SIZE,)
+                    self._client_thread_map[client] = t
+
+                    t.start()
+                    self._threads.append(t)
+
+                    conn, addr, size = client
+
+                    print 'SERVER: Waiting for message...'
+                    data = conn.recv(size)
+                    print 'SERVER: received %s bytes from %s' % (len(data), addr)
 
                 if not data:
                     break
-                sent = conn.send(data)
+                resp = self._handle_client_data(data)
+                sent = conn.send(resp)
                 print 'SERVER: sent %s bytes back to %s' % (sent, addr)
+            
 
     def get_lobby(self, lid):
         try:
@@ -44,9 +87,45 @@ class GameCoordinator(socket.socket):
     def add_client_to_lobby(self, lid=None):
         lobby = self.get_lobby(lid)
 
+    def _handle_client_data(self, data):
+        data = json.loads(data)
+        if data['type'] == 'auth':
+            resp = self._handle_auth(data)
+        elif data['type'] == 'message':
+            resp = self._handle_message(data)
+        else:
+            raise UnknownDataType
+        return resp
+
+    def _handle_auth(self, data):
+        try:
+            pid = data['pid']
+            if not pid:
+                pid = self._assign_pid()
+            self._clients.append(pid)
+            return json.dumps({'type': 'auth', 'pid': pid, 'timestamp': time.time()})
+        except KeyError:
+            raise InvalidRequest
+            
+    def _handle_message(self, data):
+        pass
+
+    def _assign_pid(self):
+        pid = 0
+        if not self._clients:
+            return pid
+        else:
+            _min = min(self._clients)
+            if not _min:
+                return max(self._clients) + 1
+            else:
+                return _min - 1
+            
+                
 def exit_handler(sig, frame):
     sys.exit(0)
     
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, exit_handler)
     gc = GameCoordinator()
+    gc._run()

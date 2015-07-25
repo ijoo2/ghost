@@ -1,27 +1,38 @@
-from socket import socket, AF_INET, SOCK_STREAM
+#!/usr/bin/env python
+
+import socket
+import sys
+import signal
+import threading
+import select
+import json
+import time
+##import lobby
+##json.dumps({'data':{'type': 'message_to_player', 'content': 'hello'}})
 
 class Client(object):
-    def __init__(self, pid, name, sock=None, nm=None):
-        self.pid = pid
+    def __init__(self, name, pid=None, sock=None, nm=None):
         self.name = name
+        self.pid = pid
         self.char = ''
         self.nm = nm
         self._connect_gc('localhost', 12345) # localhost for now
 
     def _connect_gc(self, host, port):
-        self.gc = socket(AF_INET, SOCK_STREAM)
+        self.gc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_address = ('localhost', 12345)
         try:
             self.gc.connect((host, port))
         except:
             print "CLIENT: Failed to connect to host=%s port=%i" %(host, port)
 
-        print 'CLIENT: Client name=%s' %self.name
+        print 'CLIENT: Client name=%s' %(self.name)
 
         try:
             # Send data
             print 'CLIENT: sending hello'
-            sent = self.gc.send('hello')
+            data = self._get_auth_data()
+            sent = self.gc.send(data)
 
             # Receive response
             print 'CLIENT: waiting to receive'
@@ -49,8 +60,11 @@ class Client(object):
     def _create_lobby(self):
         pass
 
+    def _get_auth_data(self):
+        return json.dumps({'type': 'auth', 'pid': self.pid, 'timestamp': time.time()})
+    
     def __str__(self):
         return '%s (%s)' %(self.name, self.pid)
 
 if __name__ == '__main__':
-    client = Client(10, 'Test')
+    client = Client('Test')
