@@ -38,16 +38,19 @@ class Client(object):
             print 'CLIENT: waiting to receive'
             data = self.gc.recv(4096)
             print 'CLIENT: received %s' % data
+            self._handle_response(data)
 
         finally:
             print 'CLIENT: closing socket'
             self._close_gc()
 
+    # Close/cleanup network connections
     def _close_gc(self):
         if self.gc:
+            data = json.dumps({'type': 'disconnect', 'pid': self.pid, 'timestamp': time.time()})
+            self.gc.send(data)
             self.gc.close()
 
-    # Close/cleanup network connections
     def disconnect(self):
         self._close_gc()
         
@@ -62,6 +65,9 @@ class Client(object):
 
     def _get_auth_data(self):
         return json.dumps({'type': 'auth', 'pid': self.pid, 'timestamp': time.time()})
+
+    def _handle_response(self, data):
+        
     
     def __str__(self):
         return '%s (%s)' %(self.name, self.pid)
