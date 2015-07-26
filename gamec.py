@@ -32,6 +32,8 @@ class GameCoordinator(object):
         self._lobbies = {}
         self._clients = []
         self._client_thread_map = {}
+
+        self.next_id = {'pid': [0], 'lid': [0], 'gid': [0]}
         
     def _start_gc(self):
         try:
@@ -70,6 +72,8 @@ class GameCoordinator(object):
                 if not data:
                     break
                 resp = self._handle_client_data(data)
+                if not resp:
+                    break
                 sent = conn.send(resp)
                 print 'SERVER: sent %s bytes back to %s' % (sent, addr)
             
@@ -93,6 +97,8 @@ class GameCoordinator(object):
             resp = self._handle_auth(data)
         elif data['type'] == 'message':
             resp = self._handle_message(data)
+        elif data['type'] == 'disconnect':
+            self._handle_disconnect(data)
         else:
             raise UnknownDataType
         return resp
@@ -101,7 +107,7 @@ class GameCoordinator(object):
         try:
             pid = data['pid']
             if not pid:
-                pid = self._assign_pid()
+                pid = self._assign_id('pid')
             self._clients.append(pid)
             return json.dumps({'type': 'auth', 'pid': pid, 'timestamp': time.time()})
         except KeyError:
@@ -110,16 +116,13 @@ class GameCoordinator(object):
     def _handle_message(self, data):
         pass
 
-    def _assign_pid(self):
-        pid = 0
-        if not self._clients:
-            return pid
-        else:
-            _min = min(self._clients)
-            if not _min:
-                return max(self._clients) + 1
-            else:
-                return _min - 1
+    def _handle_disconnect(self, data):
+        
+
+    def _assign_id(self, id_type):
+        _id = self.next_id[id_type].pop()
+        self.next_id[id_type].append(_id + 1)
+        return _id
             
                 
 def exit_handler(sig, frame):
