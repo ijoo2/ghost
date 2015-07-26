@@ -17,6 +17,7 @@ class Client(object):
         self.char = ''
         self.nm = nm
         self.gc = None
+        signal.signal(signal.SIGINT, self.exit_handler)
 
     def _run(self):
         self._connect_gc('localhost', 12345)
@@ -24,6 +25,12 @@ class Client(object):
 
         while True:
             inqueue, outqueue, exqueue = [], out, []
+            for s in inqueue:
+                pass
+            for s in outqueue:
+                pass
+            for s in exqueue:
+                pass
 
     def _connect_gc(self, host, port):
         self.gc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -52,6 +59,7 @@ class Client(object):
     def _close_gc(self):
         if self.gc:
             data = json.dumps({'type': 'disconnect', 'pid': self.pid, 'timestamp': time.time()})
+            print 'CLIENT: sending disconnect to Game Coordinator...'
             self.gc.send(data)
             self.gc.close()
 
@@ -71,7 +79,23 @@ class Client(object):
         return json.dumps({'type': 'auth', 'pid': self.pid, 'timestamp': time.time()})
 
     def _handle_response(self, data):
-        pass
+        data = json.loads(data)
+        if data['type'] == 'auth':
+            self._handle_auth(data)
+        else:
+            pass
+            
+    def _handle_auth(self, data):
+        try:
+            pid = data['pid']
+            self.pid = pid
+            print 'CLIENT: setting pid to %s' % pid
+        except KeyError:
+            self._connect_gc()
+            
+    def exit_handler(self, sig, frame):
+        self.disconnect()
+        sys.exit(0)
         
     
     def __str__(self):
