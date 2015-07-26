@@ -16,7 +16,14 @@ class Client(object):
         self.pid = pid
         self.char = ''
         self.nm = nm
-        self._connect_gc('localhost', 12345)  # localhost for now
+        self.gc = None
+
+    def _run(self):
+        self._connect_gc('localhost', 12345)
+        out = [self.gc]
+
+        while True:
+            inqueue, outqueue, exqueue = [], out, []
 
     def _connect_gc(self, host, port):
         self.gc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -72,3 +79,4 @@ class Client(object):
 
 if __name__ == '__main__':
     client = Client('Test')
+    client._run()
