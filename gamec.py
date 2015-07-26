@@ -28,12 +28,12 @@ class GameCoordinator(object):
         self.server = None
         self.BUFFER_SIZE = 1024
 
-        self._threads = []
         self._lobbies = {}
         self._clients = []
-        self._client_thread_map = {}
+        self._pid_client_map = {}
 
         self.next_id = {'pid': [0], 'lid': [0], 'gid': [0]}
+        self.queues = {'in': [], 'out': [], 'ex': []}
         
     def _start_gc(self):
         try:
@@ -50,32 +50,36 @@ class GameCoordinator(object):
 
     def _run(self):
         self._start_gc()
-        inp = [self.server]
+        self.queues['in'] = [self.server]
         while True:
-            inqueue, outqueue, exqueue = select.select(inp, [], [])
+            inqueue, outqueue, exqueue = select.select(self.queues['in'], 
+                                                       self.queues['out'], 
+                                                       self.queues['ex'])
                                                        
             for s in inqueue:
                 if s == self.server:
-                    t = threading.Thread()
                     client = self.server.accept() + (self.BUFFER_SIZE,)
-                    self._client_thread_map[client] = t
-
-                    t.start()
-                    self._threads.append(t)
-
                     conn, addr, size = client
+                    self.queues['in'].append(conn)
 
                     print 'SERVER: Waiting for message...'
                     data = conn.recv(size)
                     print 'SERVER: received %s bytes from %s' % (len(data), addr)
-
-                if not data:
-                    break
-                resp = self._handle_client_data(data)
-                if not resp:
-                    break
-                sent = conn.send(resp)
-                print 'SERVER: sent %s bytes back to %s' % (sent, addr)
+                    if not data:
+                        break
+                    resp = self._handle_client_data(data, conn)
+                    if not resp:
+                        break
+                    sent = conn.send(resp)
+                    print 'SERVER: sent %s bytes back to %s' % (sent, addr)
+                else:
+                    data = s.recv(size)
+                    if not data:
+                        break
+                    resp = self._handle_client_data(data, conn)
+                    if not resp:
+                        break
+                    s.send(resp)
             
 
     def get_lobby(self, lid):
@@ -91,34 +95,43 @@ class GameCoordinator(object):
     def add_client_to_lobby(self, lid=None):
         lobby = self.get_lobby(lid)
 
-    def _handle_client_data(self, data):
+    def _handle_client_data(self, data, client=None):
         data = json.loads(data)
+        resp = None
         if data['type'] == 'auth':
-            resp = self._handle_auth(data)
+            resp = self._handle_auth(data, client)
         elif data['type'] == 'message':
-            resp = self._handle_message(data)
+            resp = self._handle_message(data, client)
         elif data['type'] == 'disconnect':
-            self._handle_disconnect(data)
+            self._handle_disconnect(data, client)
         else:
-            raise UnknownDataType
+            self.queues['ex'].append(json.dumps({'type': 'exception', 'error': UnknownDataType}))
         return resp
 
-    def _handle_auth(self, data):
+    def _handle_auth(self, data, client):
         try:
             pid = data['pid']
             if not pid:
                 pid = self._assign_id('pid')
             self._clients.append(pid)
+            self._pid_client_map[pid] = client
             return json.dumps({'type': 'auth', 'pid': pid, 'timestamp': time.time()})
         except KeyError:
-            raise InvalidRequest
+            self.queues['ex'].append(json.dumps({'type': 'exception', 'error': InvalidRequest}))
             
-    def _handle_message(self, data):
+    def _handle_message(self, data, client):
         pass
 
-    def _handle_disconnect(self, data):
-        pass
-        
+    def _handle_disconnect(self, data, client):
+        try:
+            pid = data['pid']
+            self._clients.remove(pid)
+            self._free_id('pid', pid)
+        except ValueError:
+            self.queues['ex'].append(json.dumps({'type': 'exception', 'error': InvalidRequest}))
+            
+    def _free_id(self, id_type, id):
+        self.next_id[id_type].append(id)
 
     def _assign_id(self, id_type):
         _id = self.next_id[id_type].pop()
