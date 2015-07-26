@@ -117,6 +117,7 @@ class GameCoordinator(object):
         pass
 
     def _handle_disconnect(self, data):
+        pass
         
 
     def _assign_id(self, id_type):

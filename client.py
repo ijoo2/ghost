@@ -39,7 +39,7 @@ class Client(object):
             self._handle_response(data)
         except:
             pass
-        
+
 
     # Close/cleanup network connections
     def _close_gc(self):
@@ -64,6 +64,7 @@ class Client(object):
         return json.dumps({'type': 'auth', 'pid': self.pid, 'timestamp': time.time()})
 
     def _handle_response(self, data):
+        pass
         
     
     def __str__(self):
