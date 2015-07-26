@@ -16,7 +16,7 @@ class Client(object):
         self.pid = pid
         self.char = ''
         self.nm = nm
-        self._connect_gc('localhost', 12345) # localhost for now
+        self._connect_gc('localhost', 12345)  # localhost for now
 
     def _connect_gc(self, host, port):
         self.gc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -25,8 +25,6 @@ class Client(object):
             self.gc.connect((host, port))
         except:
             print "CLIENT: Failed to connect to host=%s port=%i" %(host, port)
-
-        print 'CLIENT: Client name=%s' %(self.name)
 
         try:
             # Send data
@@ -39,10 +37,9 @@ class Client(object):
             data = self.gc.recv(4096)
             print 'CLIENT: received %s' % data
             self._handle_response(data)
-
-        finally:
-            print 'CLIENT: closing socket'
-            self._close_gc()
+        except:
+            pass
+        
 
     # Close/cleanup network connections
     def _close_gc(self):
