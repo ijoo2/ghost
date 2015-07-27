@@ -127,15 +127,20 @@ class GameCoordinator(object):
             pid = data['pid']
             self._clients.remove(pid)
             self._free_id('pid', pid)
+            self.queues['in'].remove(client)
+            self.queues['out'].remove(client)
+            self.queues['ex'].remove(client)
         except ValueError:
-            self.queues['ex'].append(json.dumps({'type': 'exception', 'error': InvalidRequest}))
+            pass
             
-    def _free_id(self, id_type, id):
-        self.next_id[id_type].append(id)
+    def _free_id(self, id_type, _id):
+        print 'SERVER: %s %i is now available' %(id_type, _id)
+        self.next_id[id_type].append(_id)
 
     def _assign_id(self, id_type):
         _id = self.next_id[id_type].pop()
-        self.next_id[id_type].append(_id + 1)
+        if not self.next_id[id_type]: 
+            self.next_id[id_type].append(_id + 1)
         return _id
             
                 
