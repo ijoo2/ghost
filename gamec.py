@@ -39,7 +39,7 @@ class GameCoordinator(object):
         try:
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            print 'SERVER: Launching server host=%s, port=%s' %(self.host, self.port)
+            print 'GC: Launching server host=%s, port=%s' %(self.host, self.port)
             self.server.bind((self.host, self.port)) ##localhost for now
             self.server.listen(5)
         except socket.error, (val, msg):
@@ -62,16 +62,16 @@ class GameCoordinator(object):
                     conn, addr, size = client
                     self.queues['in'].append(conn)
 
-                    print 'SERVER: Waiting for message...'
+                    print 'GC: Waiting for message...'
                     data = conn.recv(size)
-                    print 'SERVER: received %s bytes from %s' % (len(data), addr)
+                    print 'GC: received %s bytes from %s' % (len(data), addr)
                     if not data:
                         break
                     resp = self._handle_client_data(data, conn)
                     if not resp:
                         break
                     sent = conn.send(resp)
-                    print 'SERVER: sent %s bytes back to %s' % (sent, addr)
+                    print 'GC: sent %s bytes back to %s' % (sent, addr)
                 else:
                     data = s.recv(size)
                     if not data:
@@ -100,7 +100,7 @@ class GameCoordinator(object):
         resp = None
         if data['type'] == 'auth':
             resp = self._handle_auth(data, client)
-        elif data['type'] == 'message':
+        elif data['type'] == 'msg':
             resp = self._handle_message(data, client)
         elif data['type'] == 'disconnect':
             self._handle_disconnect(data, client)
@@ -120,7 +120,8 @@ class GameCoordinator(object):
             self.queues['ex'].append(json.dumps({'type': 'exception', 'error': InvalidRequest}))
             
     def _handle_message(self, data, client):
-        pass
+        print 'GC: Received - %s' %(data['message'])
+        return json.dumps({'type': 'msg', 'message': data['message'], 'timestamp': time.time()})
 
     def _handle_disconnect(self, data, client):
         try:
@@ -134,7 +135,7 @@ class GameCoordinator(object):
             pass
             
     def _free_id(self, id_type, _id):
-        print 'SERVER: %s %i is now available' %(id_type, _id)
+        print 'GC: %s %i is now available' %(id_type, _id)
         self.next_id[id_type].append(_id)
 
     def _assign_id(self, id_type):

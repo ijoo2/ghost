@@ -41,11 +41,8 @@ class Client(object):
             print "CLIENT: Failed to connect to host=%s port=%i" %(host, port)
 
         try:
-            # Send data
-            print 'CLIENT: sending hello'
             data = self._get_auth_data()
-            sent = self.gc.send(data)
-
+            self.gc.send(data)
             # Receive response
             print 'CLIENT: waiting to receive'
             data = self.gc.recv(4096)
@@ -54,6 +51,15 @@ class Client(object):
         except:
             pass
 
+        while True:
+            # user entering a message
+            print ("Enter input. q to quit:")
+            user_input = sys.stdin.readline()
+            if user_input == 'q\n' or user_input == 'Q\n':
+                self.exit_handler()
+            print ("Sending message to GC")
+            message = self._get_message_data(user_input)
+            self.gc.send(message)
 
     # Close/cleanup network connections
     def _close_gc(self):
@@ -75,6 +81,9 @@ class Client(object):
     def _create_lobby(self):
         pass
 
+    def _get_message_data(self, message):
+        return json.dumps({'type': 'msg', 'message': message, 'timestamp': time.time()})
+
     def _get_auth_data(self):
         return json.dumps({'type': 'auth', 'pid': self.pid, 'timestamp': time.time()})
 
@@ -93,7 +102,7 @@ class Client(object):
         except KeyError:
             self._connect_gc()
             
-    def exit_handler(self, sig, frame):
+    def exit_handler(self):  # BEFORE: def exit_handler(self, sig, frame):
         self.disconnect()
         sys.exit(0)
         
