@@ -33,8 +33,8 @@ def prompt():
     sys.stdout.flush()
 
 
-def display_msg(msg, user):
-    sys.stdout.write('\r[%s]: %s' % ((user.strip('\n') or 'Unknown User'), msg))
+def display_msg(msg, user, is_whisper=False):
+    sys.stdout.write('\r[%s%s]: %s' % ((user.strip('\n') or 'Unknown User'), '*' * is_whisper, msg))
     sys.stdout.flush()
 
 
@@ -48,13 +48,14 @@ class UnknownCommand(Exception):
 
 class Client(object):
     def __init__(self, name, pid=None, sock=None, nm=None):
-        self.name = name
+        self.name = name.strip('\n')
         self.pid = pid
         self.nm = nm
         self.gc = None
         signal.signal(signal.SIGINT, self.exit_handler)
         self.queues = {'in': [], 'out': [], 'ex': []}
         self.peer_pid_name_map = {}
+        self.reply_target = None
 
     def _run(self):
         self._connect_gc('localhost', 12345)
@@ -141,6 +142,8 @@ class Client(object):
             self._handle_notify(data)
         elif data['type'] == 'msg':
             self._handle_message(data)
+        elif data['type'] == 'msg-w':
+            self._handle_message(data, True)
         else:
             pass
 
@@ -152,11 +155,13 @@ class Client(object):
         except KeyError:
             self._connect_gc()
 
-    def _handle_message(self, data):
+    def _handle_message(self, data, is_whisper=False):
         try:
-            msg = data['message']
-            user = self.peers_pid_name_map[str(data['from'])]
-            display_msg(msg, user)
+            msg, from_pid = data['message'], str(data['from'])
+            if is_whisper:
+                self.reply_target = from_pid
+            user = self.peer_pid_name_map[from_pid]
+            display_msg(msg, user, is_whisper)
         except KeyError:
             pass
         prompt()
@@ -164,8 +169,8 @@ class Client(object):
     def _handle_notify(self, data):
         try:
             peers = data['peers']
-            self.peers_pid_name_map = peers
-            # print 'CLIENT: Recieved updated peer map.'
+            self.peer_pid_name_map = peers
+            # print 'CLIENT: Recieved updated peer map. '
         except KeyError:
             pass
 
@@ -187,10 +192,30 @@ class Client(object):
             return
         if target not in self.peer_pid_name_map.keys():  # change this shit later
             for k, v in self.peer_pid_name_map.items():
-                if v is target:
+                if v == target:
                     target = k
                     break
-        self.gc.send(json.dumps({'type': 'msg', 'pid': self.pid, 'message': message, 'target': target, 'timestamp': time.time()}))
+        self.gc.send(json.dumps({'type': 'msg-w', 'pid': self.pid, 'message': message, 'target': int(target), 'timestamp': time.time()}))
+
+    def _command_r(self, *args):
+        """
+        Respond to the last whisper recieved.
+        """
+        message = ' '.join(args[1:])
+        self.gc.send(json.dumps({'type': 'msg-w', 'pid': self.pid, 'message': message, 'target': int(self.reply_target), 'timestamp': time.time()}))
+
+    def _command_whoami(self, *args):
+        """
+        Attempt to resolve existential crisis.
+        """
+        print 'You are %s!' % (self.name)
+
+    def _command_who(self, *args):
+        """
+        Show all users in the server.
+        """
+        for k, v in self.peer_pid_name_map.items():
+            print v
 
     def _command_q(self, *args):
         """
