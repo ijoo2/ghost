@@ -105,7 +105,7 @@ class GameCoordinator(object):
         target = None
         if data['type'] == 'auth':
             resp = json.dumps(self._handle_auth(data, client))
-        elif data['type'] == 'msg':
+        elif data['type'] in ['msg', 'msg-w']:
             resp = self._handle_message(data, client)
             try:
                 target = self._pid_client_map[resp['target']]
@@ -135,7 +135,7 @@ class GameCoordinator(object):
             self._clients.append(pid)
             self._pid_client_map[pid] = client
             self._pid_name_map[pid] = name
-            notify_conn_data = {'type': 'notify', 'peers': self._pid_name_map, 'timestamp': time.time()}
+            notify_conn_data = self._get_notify_peer_data()
             self._broadcast(notify_conn_data, -1)
             return {'type': 'auth', 'pid': pid, 'timestamp': time.time()}
         except KeyError:
@@ -156,15 +156,15 @@ class GameCoordinator(object):
                 self.response_map[conn].put(json.dumps(data))
 
     def _handle_message(self, data, client):
-        print 'GC: Received - %s' % (data['message'])
+        print 'GC: Received - ', data
         try:
             target = data['target']
-            self.queues[self._pid_client_map[target]]
+            print target, self._pid_client_map
         except KeyError:
             target = None
             msg_data = {'type': 'msg', 'message': data['message'], 'from': data['pid'], 'timestamp': time.time()}
             self._broadcast(msg_data, data['pid'])
-        return {'type': 'msg', 'message': data['message'], 'target': target, 'timestamp': time.time()}
+        return {'type': 'msg-w', 'message': data['message'], 'target': target, 'from': data['pid'], 'timestamp': time.time()}
 
     def _handle_disconnect(self, data, client):
         try:
@@ -172,7 +172,10 @@ class GameCoordinator(object):
             self._clients.remove(pid)
             self._free_id('pid', pid)
             self._remove_client_from_queues(client)
-        except ValueError:
+            del self._pid_name_map[pid]
+            msg_data = self._get_notify_peer_data()
+            self._broadcast(msg_data, pid)
+        except (ValueError, KeyError):
             pass
 
     def _remove_client_from_queues(self, client):
@@ -196,6 +199,9 @@ class GameCoordinator(object):
         if not self.next_id[id_type]:
             self.next_id[id_type].append(_id + 1)
         return _id
+
+    def _get_notify_peer_data(self):
+        return {'type': 'notify', 'peers': self._pid_name_map, 'timestamp': time.time()}
 
 
 def exit_handler(sig, frame):
